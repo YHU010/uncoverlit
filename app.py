@@ -89,6 +89,102 @@ def db_save_rating(user_name: str, book_id: str, rating: int):
         json={"user_name": user_name, "book_id": book_id, "rating": rating},
     )
 
+def db_load_recommended(user_name: str) -> list:
+    """Load all AI-recommended books for a user."""
+    r = requests.get(
+        f"{SUPA_URL}/rest/v1/ai_recommended_books",
+        headers=_headers(),
+        params={"user_name": f"eq.{user_name}", "select": "*", "order": "created_at.asc"},
+    )
+    if r.ok:
+        return r.json()
+    return []
+
+def db_save_recommended(user_name: str, book: dict, category: str, triggered_by: str, rating: int):
+    """Save an AI-recommended book to Supabase."""
+    requests.post(
+        f"{SUPA_URL}/rest/v1/ai_recommended_books",
+        headers=_headers(),
+        json={
+            "user_name": user_name,
+            "category": category,
+            "book_id": book["id"],
+            "title": book["title"],
+            "author": book["author"],
+            "isbn": book.get("isbn", ""),
+            "badge": book["badge"],
+            "summary": book["summary"],
+            "triggered_by_book_id": triggered_by,
+            "trigger_rating": rating,
+        },
+    )
+
+def get_ai_recommendation(dismissed_book: dict, rating: int, category: str, existing_titles: list):
+    """Call Claude to get a replacement book recommendation."""
+    try:
+        import anthropic, json, re
+        client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+
+        cat_label = category.split("  ", 1)[-1] if "  " in category else category
+
+        if rating >= 4:
+            direction = (
+                f"Recommend a book SIMILAR to '{dismissed_book['title']}' by {dismissed_book['author']} "
+                f"— same feel, writing quality, or theme. The user loved it ({rating}/5 stars)."
+            )
+        elif rating <= 2:
+            direction = (
+                f"Recommend a book DIFFERENT from '{dismissed_book['title']}' by {dismissed_book['author']} "
+                f"— the user disliked it ({rating}/5 stars). Avoid '{dismissed_book['badge']}' style books."
+            )
+        else:  # 3 stars — neutral, just find a great book in the category
+            direction = (
+                f"The user rated '{dismissed_book['title']}' by {dismissed_book['author']} as average (3/5). "
+                f"Recommend any excellent, highly regarded book in the {cat_label} category — no directional bias."
+            )
+
+        avoid = ", ".join(f'"{t}"' for t in existing_titles[:40])
+
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=350,
+            messages=[{
+                "role": "user",
+                "content": f"""You are a book recommendation engine for the category: {cat_label}.
+
+{direction}
+
+Return ONLY a valid JSON object, no other text:
+{{
+  "title": "Book Title",
+  "author": "Author Name",
+  "isbn": "9780000000000",
+  "badge": "Short Genre Tag",
+  "summary": "One to two compelling sentences about this book."
+}}
+
+Do NOT recommend any of these already-shown books: {avoid}
+The badge should be a short genre label (e.g. Memoir, Thriller, Investing, Romance)."""
+            }]
+        )
+
+        text = msg.content[0].text.strip()
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            data = json.loads(match.group())
+            book_id = f"ai_{dismissed_book['id']}_{rating}"
+            return {
+                "id": book_id,
+                "title": data["title"],
+                "author": data["author"],
+                "isbn": data.get("isbn", ""),
+                "badge": data.get("badge", dismissed_book["badge"]),
+                "summary": data["summary"],
+            }
+    except Exception:
+        pass
+    return None
+
 # ── STYLES ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -673,6 +769,13 @@ if _qp in PRESET_USERS:
     st.session_state.current_user = _qp
     st.session_state.dismissed = db_load_dismissed(_qp)
     st.session_state.ratings = db_load_ratings(_qp)
+    raw_rec = db_load_recommended(_qp)
+    st.session_state.recommended_books = [
+        {"id": r["book_id"], "title": r["title"], "author": r["author"],
+         "isbn": r["isbn"], "badge": r["badge"], "summary": r["summary"],
+         "category": r["category"]}
+        for r in raw_rec
+    ]
     st.query_params.clear()
     st.rerun()
 
@@ -749,6 +852,22 @@ if "dismissed" not in st.session_state:
 # ratings: {book_id: 1-5}
 if "ratings" not in st.session_state:
     st.session_state.ratings = db_load_ratings(st.session_state.current_user)
+
+# AI-recommended books list
+if "recommended_books" not in st.session_state:
+    raw = db_load_recommended(st.session_state.current_user)
+    st.session_state.recommended_books = [
+        {
+            "id": r["book_id"],
+            "title": r["title"],
+            "author": r["author"],
+            "isbn": r["isbn"],
+            "badge": r["badge"],
+            "summary": r["summary"],
+            "category": r["category"],
+        }
+        for r in raw
+    ]
 
 # Flat list of all books across categories (used by smart sort)
 BOOKS_ALL = [b for cat_books in BOOKS.values() for b in cat_books]
@@ -851,7 +970,10 @@ tabs = st.tabs(list(BOOKS.keys()))
 
 for tab, category in zip(tabs, BOOKS.keys()):
     with tab:
-        visible   = smart_sort([b for b in BOOKS[category] if b["id"] not in st.session_state.dismissed])
+        rec_for_cat = [b for b in st.session_state.get("recommended_books", [])
+                       if b.get("category") == category]
+        all_cat_books = BOOKS[category] + rec_for_cat
+        visible   = smart_sort([b for b in all_cat_books if b["id"] not in st.session_state.dismissed])
         showing   = visible[:SHOW_COUNT]
 
         if not showing:
@@ -975,5 +1097,23 @@ for tab, category in zip(tabs, BOOKS.keys()):
                             key=f"dismiss_{book['id']}",
                             use_container_width=True,
                         ):
+                            rating = st.session_state.ratings.get(book["id"], 0)
                             dismiss_book(book["id"])
+                            if rating in (1, 2, 3, 4, 5):
+                                all_titles = (
+                                    [b["title"] for b in BOOKS_ALL] +
+                                    [b["title"] for b in st.session_state.get("recommended_books", [])]
+                                )
+                                with st.spinner("Finding your next read..."):
+                                    new_book = get_ai_recommendation(book, rating, category, all_titles)
+                                if new_book:
+                                    db_save_recommended(
+                                        st.session_state.current_user,
+                                        new_book, category, book["id"], rating,
+                                    )
+                                    if "recommended_books" not in st.session_state:
+                                        st.session_state.recommended_books = []
+                                    st.session_state.recommended_books.append(
+                                        {**new_book, "category": category}
+                                    )
                             st.rerun()
