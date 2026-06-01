@@ -1,5 +1,6 @@
 import streamlit as st
 import urllib.parse
+import requests
 
 st.set_page_config(
     page_title="UncoverLit",
@@ -7,6 +8,66 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# ── SUPABASE (direct REST API — no package needed) ─────────────────────────────
+
+SUPA_URL = st.secrets["SUPABASE_URL"]
+SUPA_KEY = st.secrets["SUPABASE_KEY"]
+
+def _headers():
+    return {
+        "apikey": SUPA_KEY,
+        "Authorization": f"Bearer {SUPA_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+
+def db_load_dismissed(user_name: str) -> set:
+    """Load all dismissed book_ids for a user."""
+    r = requests.get(
+        f"{SUPA_URL}/rest/v1/dismissed_books",
+        headers=_headers(),
+        params={"user_name": f"eq.{user_name}", "select": "book_id"},
+    )
+    if r.ok:
+        return {row["book_id"] for row in r.json()}
+    return set()
+
+def db_dismiss(user_name: str, book_id: str):
+    """Save a single dismissal."""
+    requests.post(
+        f"{SUPA_URL}/rest/v1/dismissed_books",
+        headers=_headers(),
+        json={"user_name": user_name, "book_id": book_id},
+    )
+
+def db_reset_all(user_name: str):
+    """Remove all dismissals for a user."""
+    requests.delete(
+        f"{SUPA_URL}/rest/v1/dismissed_books",
+        headers=_headers(),
+        params={"user_name": f"eq.{user_name}"},
+    )
+
+def db_reset_category(user_name: str, book_ids: list):
+    """Remove dismissals for a specific category."""
+    for bid in book_ids:
+        requests.delete(
+            f"{SUPA_URL}/rest/v1/dismissed_books",
+            headers=_headers(),
+            params={"user_name": f"eq.{user_name}", "book_id": f"eq.{bid}"},
+        )
+
+def db_get_known_users() -> list:
+    """Return all users who have ever dismissed a book."""
+    r = requests.get(
+        f"{SUPA_URL}/rest/v1/dismissed_books",
+        headers=_headers(),
+        params={"select": "user_name"},
+    )
+    if r.ok:
+        return sorted({row["user_name"] for row in r.json()})
+    return []
 
 # ── STYLES ─────────────────────────────────────────────────────────────────────
 st.markdown("""
@@ -421,22 +482,154 @@ BADGE_COLORS = {
 }
 DEFAULT_BADGE = ("#F2F4F8", "#3A4A5C")
 
-# ── SESSION STATE ──────────────────────────────────────────────────────────────
+# ── NAME PICKER ───────────────────────────────────────────────────────────────
 
+PRESET_USERS = ["YHU010", "SPJEN"]
+
+# Avatar colour per profile
+AVATAR_COLORS = {
+    "YHU010": ("#1B3A6B", "#4A7CC7"),   # navy + blue
+    "SPJEN":  ("#5B1A6B", "#A855C7"),   # plum + purple
+}
+
+if "current_user" not in st.session_state:
+    st.markdown("""
+    <style>
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"] { background: #0D1B2A; }
+    .block-container { padding-top: 0 !important; max-width: 1400px !important; }
+
+    /* Profile card buttons */
+    div[data-testid="stButton"] > button {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+        cursor: pointer !important;
+    }
+    div[data-testid="stButton"] > button:hover .profile-card {
+        border-color: #C5973A !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Dark full-page header
+    st.markdown("""
+    <div style="background:#0D1B2A;margin:0 -6rem;padding:2rem 6rem 1.6rem 6rem;
+                border-bottom:3px solid #C5973A;">
+        <h1 style="font-size:1.9rem;font-weight:800;color:#FFF;margin:0;
+                   font-family:Georgia,serif;letter-spacing:-0.5px;">📚 UncoverLit</h1>
+        <p style="color:#8A9BB0;font-size:0.82rem;margin:0.2rem 0 0 0;
+                  text-transform:uppercase;letter-spacing:0.03em;">
+            Curated reads that change lives
+        </p>
+    </div>
+    <div style="text-align:center;padding:4rem 0 2.5rem 0;">
+        <p style="font-size:1.9rem;font-weight:700;color:#FFFFFF;margin:0 0 0.5rem 0;
+                  font-family:Georgia,serif;">Who's reading today?</p>
+        <p style="font-size:0.95rem;color:#6A8AAA;margin:0;">
+            Your reading history is saved — dismissed books stay hidden on every visit.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Profile cards — two columns centred
+    _, c1, gap, c2, _ = st.columns([1.2, 1, 0.15, 1, 1.2])
+
+    for col, name in zip([c1, c2], PRESET_USERS):
+        dark, light = AVATAR_COLORS.get(name, ("#1B3A6B", "#4A7CC7"))
+        initial = name[0].upper()
+        with col:
+            # Visual card rendered as HTML
+            st.markdown(f"""
+            <div style="
+                background: #132030;
+                border: 2px solid #1E3048;
+                border-radius: 20px;
+                padding: 2rem 1rem 1.6rem 1rem;
+                text-align: center;
+                margin-bottom: 0.5rem;
+                transition: border-color 0.2s, box-shadow 0.2s;
+                cursor: pointer;
+            " onmouseover="this.style.borderColor='#C5973A';this.style.boxShadow='0 8px 32px rgba(197,151,58,0.22)'"
+              onmouseout="this.style.borderColor='#1E3048';this.style.boxShadow='none'">
+                <div style="
+                    width: 72px; height: 72px;
+                    border-radius: 50%;
+                    background: linear-gradient(135deg, {dark}, {light});
+                    display: flex; align-items: center; justify-content: center;
+                    margin: 0 auto 1rem auto;
+                    font-size: 1.8rem; font-weight: 800; color: white;
+                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+                ">{initial}</div>
+                <p style="color:#FFFFFF;font-size:1.1rem;font-weight:700;
+                           margin:0 0 0.2rem 0;letter-spacing:0.08em;">{name}</p>
+                <p style="color:#4A6A8A;font-size:0.75rem;margin:0;">
+                    Tap to continue
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Invisible full-width button overlapping the card
+            st.markdown("""
+            <style>
+            div[data-testid="stButton"] > button {
+                margin-top: -160px !important;
+                height: 160px !important;
+                background: transparent !important;
+                border: none !important;
+                color: transparent !important;
+                width: 100% !important;
+                cursor: pointer !important;
+                position: relative !important;
+                z-index: 10 !important;
+            }
+            div[data-testid="stButton"] > button:focus {
+                box-shadow: none !important;
+                outline: none !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            if st.button("select", key=f"pick_{name}", use_container_width=True):
+                st.session_state.current_user = name
+                st.session_state.dismissed = db_load_dismissed(name)
+                st.rerun()
+
+    st.stop()
+
+# ── SESSION STATE (user is now logged in) ──────────────────────────────────────
+
+# dismissed is a flat set of book_ids (loaded from Supabase on login)
 if "dismissed" not in st.session_state:
-    st.session_state.dismissed = {cat: set() for cat in BOOKS}
+    st.session_state.dismissed = db_load_dismissed(st.session_state.current_user)
+
+def dismiss_book(book_id: str):
+    st.session_state.dismissed.add(book_id)
+    db_dismiss(st.session_state.current_user, book_id)
+
+def reset_all():
+    st.session_state.dismissed = set()
+    db_reset_all(st.session_state.current_user)
+
+def reset_category(cat_book_ids: list):
+    for bid in cat_book_ids:
+        st.session_state.dismissed.discard(bid)
+    db_reset_category(st.session_state.current_user, cat_book_ids)
 
 # ── HEADER ─────────────────────────────────────────────────────────────────────
 
-st.markdown("""
+user = st.session_state.current_user
+st.markdown(f"""
 <div class="site-header">
     <div class="site-header-left">
         <h1>📚 UncoverLit</h1>
         <p>Curated reads that change lives &nbsp;·&nbsp; Handpicked across every genre that matters</p>
     </div>
     <div class="site-header-right">
-        🏛 Library links search <a href="https://www.newprovlibrary.org" target="_blank">New Providence Memorial Library</a><br>
-        📖 Everand links open a direct search for each title
+        👤 Reading as <strong style="color:#E8C97A">{user}</strong><br>
+        <span style="font-size:0.7rem;color:#445566;">
+        🏛 Library = New Providence Memorial &nbsp;·&nbsp; 📖 Everand = direct search
+        </span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -444,21 +637,32 @@ st.markdown("""
 # ── SIDEBAR ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown("### Options")
-    st.markdown("Books you dismiss are hidden and replaced with the next queued pick.")
+    st.markdown(f"### 👤 {st.session_state.current_user}")
+    st.markdown("Dismissed books are saved — they'll stay hidden next time you visit.")
     st.divider()
-    if st.button("↺  Show all books again", use_container_width=True):
-        for cat in BOOKS:
-            st.session_state.dismissed[cat] = set()
+
+    total_hidden = len(st.session_state.dismissed)
+    if st.button(f"↺  Show all books again ({total_hidden} hidden)", use_container_width=True):
+        reset_all()
         st.rerun()
+
     st.divider()
-    for cat in BOOKS:
-        n = len(st.session_state.dismissed[cat])
+
+    # Per-category reset buttons
+    for cat, books in BOOKS.items():
+        cat_ids = [b["id"] for b in books]
+        n = len(st.session_state.dismissed & set(cat_ids))
         if n:
             label = cat.split("  ", 1)[1]
             if st.button(f"Reset {label} ({n} hidden)", use_container_width=True, key=f"reset_{cat}"):
-                st.session_state.dismissed[cat] = set()
+                reset_category(cat_ids)
                 st.rerun()
+
+    st.divider()
+    if st.button("🔄  Switch reader", use_container_width=True):
+        del st.session_state.current_user
+        del st.session_state.dismissed
+        st.rerun()
 
 # ── TABS ───────────────────────────────────────────────────────────────────────
 
@@ -466,8 +670,7 @@ tabs = st.tabs(list(BOOKS.keys()))
 
 for tab, category in zip(tabs, BOOKS.keys()):
     with tab:
-        dismissed = st.session_state.dismissed[category]
-        visible   = [b for b in BOOKS[category] if b["id"] not in dismissed]
+        visible   = [b for b in BOOKS[category] if b["id"] not in st.session_state.dismissed]
         showing   = visible[:SHOW_COUNT]
 
         if not showing:
@@ -483,10 +686,12 @@ for tab, category in zip(tabs, BOOKS.keys()):
             </div>
             """, unsafe_allow_html=True)
         else:
+            cat_ids   = {b["id"] for b in BOOKS[category]}
+            n_hidden  = len(st.session_state.dismissed & cat_ids)
             info = f"Showing **{len(showing)}** of **{len(BOOKS[category])}** books"
-            if len(dismissed):
+            if n_hidden:
                 remaining = len(visible) - len(showing)
-                info += f"&nbsp;&nbsp;·&nbsp;&nbsp;{len(dismissed)} hidden"
+                info += f"&nbsp;&nbsp;·&nbsp;&nbsp;{n_hidden} hidden"
                 if remaining:
                     info += f"&nbsp;&nbsp;·&nbsp;&nbsp;{remaining} more queued"
             st.caption(info)
@@ -545,7 +750,7 @@ for tab, category in zip(tabs, BOOKS.keys()):
                                 key=f"dismiss_{book['id']}",
                                 use_container_width=True,
                             ):
-                                st.session_state.dismissed[category].add(book["id"])
+                                dismiss_book(book["id"])
                                 st.rerun()
 
                             st.markdown('</div>', unsafe_allow_html=True)
