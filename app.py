@@ -257,6 +257,21 @@ st.markdown("""
 /* ── Star rating select slider ── */
 [data-testid="stSlider"] { padding: 0 !important; }
 [data-testid="stSlider"] > div { padding: 0 !important; }
+
+/* ── Dismiss button — muted, clearly secondary ── */
+[data-testid="stVerticalBlockBorderWrapper"] .stButton:last-of-type > button {
+    background: #FAFAFA !important;
+    color: #9AAAB8 !important;
+    border: 1px solid #E8ECF0 !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.04em !important;
+    font-weight: 400 !important;
+}
+[data-testid="stVerticalBlockBorderWrapper"] .stButton:last-of-type > button:hover {
+    background: #FFF0F0 !important;
+    color: #C05050 !important;
+    border-color: #F0CCCC !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -652,24 +667,22 @@ GIRL_AVATAR_SVG = """<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http
 
 AVATAR_SVG = {"YHU010": BOY_AVATAR_SVG, "SPJEN": GIRL_AVATAR_SVG}
 
+# Single-click login via URL query param (set by clicking the card link)
+_qp = st.query_params.get("user", "")
+if _qp in PRESET_USERS:
+    st.session_state.current_user = _qp
+    st.session_state.dismissed = db_load_dismissed(_qp)
+    st.session_state.ratings = db_load_ratings(_qp)
+    st.query_params.clear()
+    st.rerun()
+
 if "current_user" not in st.session_state:
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"],
     [data-testid="stMain"] { background: #0D1B2A; }
     .block-container { padding-top: 0 !important; max-width: 1400px !important; }
-
-    /* Profile card buttons */
-    div[data-testid="stButton"] > button {
-        background: transparent !important;
-        border: none !important;
-        padding: 0 !important;
-        width: 100% !important;
-        cursor: pointer !important;
-    }
-    div[data-testid="stButton"] > button:hover .profile-card {
-        border-color: #C5973A !important;
-    }
+    a.profile-link { text-decoration: none !important; display: block; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -696,20 +709,20 @@ if "current_user" not in st.session_state:
     </div>
     """, unsafe_allow_html=True)
 
-    # Profile cards — two columns centred
+    # Profile cards — each card is a plain HTML link, one click enters the profile
     _, c1, gap, c2, _ = st.columns([1.2, 1, 0.15, 1, 1.2])
 
     for col, name in zip([c1, c2], PRESET_USERS):
         avatar = AVATAR_SVG.get(name, "")
         with col:
             st.markdown(f"""
+            <a href="?user={name}" class="profile-link">
             <div style="
                 background: #132030;
                 border: 2px solid #1E3048;
                 border-radius: 20px;
-                padding: 2rem 1rem 1.6rem 1rem;
+                padding: 2rem 1rem 1.8rem 1rem;
                 text-align: center;
-                margin-bottom: 0.5rem;
                 transition: border-color 0.2s, box-shadow 0.2s;
                 cursor: pointer;
             " onmouseover="this.style.borderColor='#C5973A';this.style.boxShadow='0 8px 32px rgba(197,151,58,0.22)'"
@@ -720,37 +733,10 @@ if "current_user" not in st.session_state:
                 </div>
                 <p style="color:#FFFFFF;font-size:1.1rem;font-weight:700;
                            margin:0 0 0.2rem 0;letter-spacing:0.08em;">{name}</p>
-                <p style="color:#4A6A8A;font-size:0.75rem;margin:0;">
-                    Tap to continue
-                </p>
+                <p style="color:#4A6A8A;font-size:0.75rem;margin:0;">Tap to continue</p>
             </div>
+            </a>
             """, unsafe_allow_html=True)
-
-            # Invisible full-width button overlapping the card
-            st.markdown("""
-            <style>
-            div[data-testid="stButton"] > button {
-                margin-top: -160px !important;
-                height: 160px !important;
-                background: transparent !important;
-                border: none !important;
-                color: transparent !important;
-                width: 100% !important;
-                cursor: pointer !important;
-                position: relative !important;
-                z-index: 10 !important;
-            }
-            div[data-testid="stButton"] > button:focus {
-                box-shadow: none !important;
-                outline: none !important;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            if st.button("select", key=f"pick_{name}", use_container_width=True):
-                st.session_state.current_user = name
-                st.session_state.dismissed = db_load_dismissed(name)
-                st.session_state.ratings = db_load_ratings(name)
-                st.rerun()
 
     st.stop()
 
@@ -950,48 +936,44 @@ for tab, category in zip(tabs, BOOKS.keys()):
                         """, unsafe_allow_html=True)
 
                         # ── Action buttons ──
-                        with st.container():
-                            st.markdown('<div style="padding: 0 1rem 0.75rem 1rem;">', unsafe_allow_html=True)
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                st.link_button(
-                                    "🏛  Library",
-                                    library_url(book["isbn"], book["title"], book["author"]),
-                                    use_container_width=True,
-                                )
-                            with c2:
-                                st.link_button(
-                                    "📖  Everand",
-                                    everand_url(book["title"]),
-                                    use_container_width=True,
-                                )
-
-                            # Star rating (select slider)
-                            star_opts = ["☆ Not rated", "★ 1", "★★ 2", "★★★ 3", "★★★★ 4", "★★★★★ 5"]
-                            cur_idx = saved_rating  # 0 = not rated, 1-5 = stars
-                            chosen = st.select_slider(
-                                "Rate",
-                                options=star_opts,
-                                value=star_opts[cur_idx],
-                                key=f"rate_{book['id']}",
-                                label_visibility="collapsed",
-                            )
-                            new_idx = star_opts.index(chosen)
-                            if new_idx != cur_idx:
-                                if new_idx == 0:
-                                    st.session_state.ratings.pop(book["id"], None)
-                                else:
-                                    st.session_state.ratings[book["id"]] = new_idx
-                                    db_save_rating(st.session_state.current_user,
-                                                   book["id"], new_idx)
-                                st.rerun()
-
-                            if st.button(
-                                "✕  Already read · Not for me",
-                                key=f"dismiss_{book['id']}",
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.link_button(
+                                "🏛  Library",
+                                library_url(book["isbn"], book["title"], book["author"]),
                                 use_container_width=True,
-                            ):
-                                dismiss_book(book["id"])
-                                st.rerun()
+                            )
+                        with c2:
+                            st.link_button(
+                                "📖  Everand",
+                                everand_url(book["title"]),
+                                use_container_width=True,
+                            )
 
-                            st.markdown('</div>', unsafe_allow_html=True)
+                        # Star rating
+                        star_opts = ["☆ Not rated", "★ 1", "★★ 2", "★★★ 3", "★★★★ 4", "★★★★★ 5"]
+                        cur_idx = saved_rating
+                        chosen = st.select_slider(
+                            "Rate",
+                            options=star_opts,
+                            value=star_opts[cur_idx],
+                            key=f"rate_{book['id']}",
+                            label_visibility="collapsed",
+                        )
+                        new_idx = star_opts.index(chosen)
+                        if new_idx != cur_idx:
+                            if new_idx == 0:
+                                st.session_state.ratings.pop(book["id"], None)
+                            else:
+                                st.session_state.ratings[book["id"]] = new_idx
+                                db_save_rating(st.session_state.current_user,
+                                               book["id"], new_idx)
+                            st.rerun()
+
+                        if st.button(
+                            "Mark as read / not for me",
+                            key=f"dismiss_{book['id']}",
+                            use_container_width=True,
+                        ):
+                            dismiss_book(book["id"])
+                            st.rerun()
