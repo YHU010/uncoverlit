@@ -69,6 +69,26 @@ def db_get_known_users() -> list:
         return sorted({row["user_name"] for row in r.json()})
     return []
 
+def db_load_ratings(user_name: str) -> dict:
+    """Load all ratings for a user — returns {book_id: rating}."""
+    r = requests.get(
+        f"{SUPA_URL}/rest/v1/book_ratings",
+        headers=_headers(),
+        params={"user_name": f"eq.{user_name}", "select": "book_id,rating"},
+    )
+    if r.ok:
+        return {row["book_id"]: row["rating"] for row in r.json()}
+    return {}
+
+def db_save_rating(user_name: str, book_id: str, rating: int):
+    """Upsert a rating (insert or update if exists)."""
+    upsert_headers = {**_headers(), "Prefer": "resolution=merge-duplicates"}
+    requests.post(
+        f"{SUPA_URL}/rest/v1/book_ratings?on_conflict=user_name,book_id",
+        headers=upsert_headers,
+        json={"user_name": user_name, "book_id": book_id, "rating": rating},
+    )
+
 # ── STYLES ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -233,6 +253,10 @@ st.markdown("""
 [data-testid="stSidebar"] button {
     font-size: 0.82rem !important;
 }
+
+/* ── Star rating select slider ── */
+[data-testid="stSlider"] { padding: 0 !important; }
+[data-testid="stSlider"] > div { padding: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -486,11 +510,183 @@ DEFAULT_BADGE = ("#F2F4F8", "#3A4A5C")
 
 PRESET_USERS = ["YHU010", "SPJEN"]
 
-# Avatar colour per profile
-AVATAR_COLORS = {
-    "YHU010": ("#1B3A6B", "#4A7CC7"),   # navy + blue
-    "SPJEN":  ("#5B1A6B", "#A855C7"),   # plum + purple
-}
+# ── LOGO SVG ──────────────────────────────────────────────────────────────────
+# Open book: two pages with text lines, clear spine, unmistakably a book
+LOGO_SVG = """<svg width="56" height="48" viewBox="0 0 56 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="ll" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#1A4A9A"/><stop offset="100%" stop-color="#3A80CC"/>
+    </linearGradient>
+    <linearGradient id="lr" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A87020"/><stop offset="100%" stop-color="#E0B040"/>
+    </linearGradient>
+  </defs>
+  <!-- left page — sweeps up-left from spine base -->
+  <path d="M27,45 C20,44 6,38 2,20 C6,6 20,4 27,8Z" fill="url(#ll)"/>
+  <!-- inner highlight left -->
+  <path d="M27,45 C22,44 10,38 8,24 C11,12 22,8 27,8Z" fill="white" opacity="0.07"/>
+  <!-- text lines left -->
+  <line x1="7" y1="19" x2="22" y2="15" stroke="white" stroke-width="0.9" opacity="0.55"/>
+  <line x1="6" y1="25" x2="21" y2="21" stroke="white" stroke-width="0.9" opacity="0.5"/>
+  <line x1="6" y1="31" x2="20" y2="28" stroke="white" stroke-width="0.9" opacity="0.45"/>
+  <line x1="8" y1="37" x2="21" y2="34" stroke="white" stroke-width="0.9" opacity="0.38"/>
+  <!-- right page — sweeps up-right from spine base -->
+  <path d="M29,45 C36,44 50,38 54,20 C50,6 36,4 29,8Z" fill="url(#lr)"/>
+  <!-- inner highlight right -->
+  <path d="M29,45 C34,44 46,38 48,24 C45,12 34,8 29,8Z" fill="white" opacity="0.05"/>
+  <!-- text lines right -->
+  <line x1="34" y1="15" x2="49" y2="19" stroke="white" stroke-width="0.9" opacity="0.55"/>
+  <line x1="35" y1="21" x2="50" y2="25" stroke="white" stroke-width="0.9" opacity="0.5"/>
+  <line x1="36" y1="28" x2="50" y2="31" stroke="white" stroke-width="0.9" opacity="0.45"/>
+  <line x1="35" y1="34" x2="48" y2="37" stroke="white" stroke-width="0.9" opacity="0.38"/>
+  <!-- spine -->
+  <rect x="26.5" y="7" width="3" height="39" rx="1.5" fill="#0D1B2A"/>
+  <!-- top arch — page tops curving away from spine -->
+  <path d="M2,20 C8,4 20,2 28,6 C36,2 48,4 54,20" fill="none" stroke="#0D1B2A" stroke-width="1.1" opacity="0.25"/>
+  <!-- base shadow -->
+  <ellipse cx="28" cy="46" rx="20" ry="2.5" fill="#0D1B2A" opacity="0.15"/>
+</svg>"""
+
+# ── AVATAR SVGs ────────────────────────────────────────────────────────────────
+BOY_AVATAR_SVG = """<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg_b" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0A1628"/><stop offset="100%" stop-color="#162952"/>
+    </linearGradient>
+    <clipPath id="cp_b"><circle cx="40" cy="40" r="40"/></clipPath>
+  </defs>
+  <circle cx="40" cy="40" r="40" fill="url(#bg_b)"/>
+  <g clip-path="url(#cp_b)">
+    <!-- jacket / shoulders -->
+    <path d="M10,85 Q14,62 26,60 Q33,70 40,72 Q47,70 54,60 Q66,62 70,85Z" fill="#1A2840"/>
+    <path d="M32,60 Q36,67 40,69 Q44,67 48,60" stroke="#2D4060" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- collar detail -->
+    <rect x="35" y="59" width="10" height="6" rx="1" fill="#0D1E35"/>
+    <!-- neck -->
+    <rect x="35" y="54" width="10" height="8" fill="#E8A870"/>
+    <!-- head -->
+    <ellipse cx="40" cy="38" rx="18" ry="20" fill="#EAAA78"/>
+    <path d="M22,43 Q22,59 40,61 Q58,59 58,43Z" fill="#EAAA78"/>
+    <ellipse cx="22" cy="39" rx="3" ry="4" fill="#DE9C68"/>
+    <ellipse cx="58" cy="39" rx="3" ry="4" fill="#DE9C68"/>
+    <!-- hair — side-swept cool style, dark with a highlight -->
+    <path d="M22,26 Q24,8 40,6 Q56,8 58,26 Q52,14 40,12 Q28,14 22,26Z" fill="#0F0805"/>
+    <!-- side-swept fringe sweeping left-to-right across forehead -->
+    <path d="M18,22 Q28,12 50,16 Q54,18 56,24 Q44,14 28,16 Q22,18 18,22Z" fill="#1A100A"/>
+    <!-- a few loose hair strands for texture -->
+    <path d="M22,24 Q24,20 26,22" stroke="#0A0604" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M50,14 Q53,16 54,20" stroke="#0A0604" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- eyebrows — sharp, slightly angled -->
+    <path d="M25,30 Q30,27.5 35,29" stroke="#150C06" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M45,29 Q50,27.5 55,30" stroke="#150C06" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <!-- eyes — large anime eyes, no glasses -->
+    <path d="M24,36 Q30,30 36,36 Q30,41 24,36Z" fill="#0D0806"/>
+    <path d="M44,36 Q50,30 56,36 Q50,41 44,36Z" fill="#0D0806"/>
+    <!-- iris -->
+    <circle cx="30" cy="36" r="3.5" fill="#2C4E8A"/>
+    <circle cx="50" cy="36" r="3.5" fill="#2C4E8A"/>
+    <!-- pupil -->
+    <circle cx="30" cy="36" r="2" fill="#050302"/>
+    <circle cx="50" cy="36" r="2" fill="#050302"/>
+    <!-- eye highlights -->
+    <circle cx="31.5" cy="34.5" r="1.2" fill="white" opacity="0.9"/>
+    <circle cx="51.5" cy="34.5" r="1.2" fill="white" opacity="0.9"/>
+    <circle cx="29" cy="37.5" r="0.6" fill="white" opacity="0.5"/>
+    <circle cx="49" cy="37.5" r="0.6" fill="white" opacity="0.5"/>
+    <!-- lower lash line -->
+    <path d="M24,38 Q30,40.5 36,38" stroke="#0D0806" stroke-width="0.8" fill="none" opacity="0.6"/>
+    <path d="M44,38 Q50,40.5 56,38" stroke="#0D0806" stroke-width="0.8" fill="none" opacity="0.6"/>
+    <!-- nose -->
+    <path d="M38,42 Q40,44 42,42" stroke="#C88858" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    <!-- mouth — slight confident smirk -->
+    <path d="M33,50 Q37,54 43,52 Q47,50 48,49" stroke="#B87040" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>"""
+
+GIRL_AVATAR_SVG = """<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg_g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFE4F0"/><stop offset="100%" stop-color="#FFBBD5"/>
+    </linearGradient>
+    <clipPath id="cp_g"><circle cx="40" cy="40" r="40"/></clipPath>
+  </defs>
+  <circle cx="40" cy="40" r="40" fill="url(#bg_g)"/>
+  <g clip-path="url(#cp_g)">
+    <!-- light blouse / shoulders -->
+    <path d="M10,85 Q14,62 26,60 Q33,70 40,72 Q47,70 54,60 Q66,62 70,85Z" fill="#FFCCE5"/>
+    <path d="M32,60 Q36,67 40,69 Q44,67 48,60" stroke="#FFAACC" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- pearl necklace -->
+    <circle cx="33" cy="61" r="1.4" fill="#F8F4EE" opacity="0.95"/>
+    <circle cx="36.5" cy="63" r="1.4" fill="#F8F4EE" opacity="0.95"/>
+    <circle cx="40" cy="63.5" r="1.4" fill="#F8F4EE" opacity="0.95"/>
+    <circle cx="43.5" cy="63" r="1.4" fill="#F8F4EE" opacity="0.95"/>
+    <circle cx="47" cy="61" r="1.4" fill="#F8F4EE" opacity="0.95"/>
+    <!-- neck -->
+    <rect x="34" y="53" width="12" height="10" fill="#F8D0A8"/>
+    <!-- small gold stud earrings -->
+    <circle cx="21" cy="40" r="2" fill="#E8C050"/>
+    <circle cx="59" cy="40" r="2" fill="#E8C050"/>
+    <!-- head — round and youthful -->
+    <ellipse cx="40" cy="37" rx="18" ry="20" fill="#F8D0A0"/>
+    <path d="M22,42 Q22,58 40,60 Q58,58 58,42Z" fill="#F8D0A0"/>
+    <ellipse cx="22" cy="38" rx="2.5" ry="4" fill="#F0C090"/>
+    <ellipse cx="58" cy="38" rx="2.5" ry="4" fill="#F0C090"/>
+    <!-- long dark hair — back layer -->
+    <path d="M18,28 Q12,52 14,84 L28,84 Q22,54 23,28Z" fill="#1E0C06"/>
+    <path d="M62,28 Q68,52 66,84 L52,84 Q58,54 57,28Z" fill="#1E0C06"/>
+    <!-- hair top — neat, slight centre part -->
+    <path d="M22,25 Q24,6 40,4 Q56,6 58,25 Q50,12 40,10 Q30,12 22,25Z" fill="#1E0C06"/>
+    <!-- cute pink bow clip on right side -->
+    <path d="M54,19 Q59,15 64,19 Q59,23 54,19Z" fill="#FF80A8"/>
+    <path d="M54,19 Q59,23 64,19 Q59,15 54,19Z" fill="#FF6090" opacity="0.75"/>
+    <circle cx="59" cy="19" r="2.2" fill="#FF4A88"/>
+    <!-- eyebrows — soft gentle arch -->
+    <path d="M26,28 Q31,25.5 36,27" stroke="#1E0C06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M44,27 Q49,25.5 54,28" stroke="#1E0C06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- eyes — large, round, innocent (not almond-goth, more circular) -->
+    <ellipse cx="30" cy="35" rx="7" ry="6.5" fill="white"/>
+    <ellipse cx="50" cy="35" rx="7" ry="6.5" fill="white"/>
+    <!-- upper lash line -->
+    <path d="M23,35 Q30,27.5 37,35" stroke="#1E0C06" stroke-width="1.8" fill="#1E0C06"/>
+    <path d="M43,35 Q50,27.5 57,35" stroke="#1E0C06" stroke-width="1.8" fill="#1E0C06"/>
+    <!-- iris — warm caramel brown (bright not dark) -->
+    <circle cx="30" cy="35.5" r="4.2" fill="#7A4020"/>
+    <circle cx="50" cy="35.5" r="4.2" fill="#7A4020"/>
+    <!-- pupil -->
+    <circle cx="30" cy="35.5" r="2.4" fill="#100804"/>
+    <circle cx="50" cy="35.5" r="2.4" fill="#100804"/>
+    <!-- bright highlights — big and sparkly (innocent look) -->
+    <circle cx="32" cy="33" r="1.8" fill="white" opacity="0.97"/>
+    <circle cx="52" cy="33" r="1.8" fill="white" opacity="0.97"/>
+    <circle cx="28.5" cy="37" r="0.9" fill="white" opacity="0.75"/>
+    <circle cx="48.5" cy="37" r="0.9" fill="white" opacity="0.75"/>
+    <!-- lower lash line — gentle -->
+    <path d="M23,37 Q30,40.5 37,37" stroke="#1E0C06" stroke-width="0.7" fill="none" opacity="0.45"/>
+    <path d="M43,37 Q50,40.5 57,37" stroke="#1E0C06" stroke-width="0.7" fill="none" opacity="0.45"/>
+    <!-- simple sweet upper lashes -->
+    <line x1="25" y1="33" x2="23.5" y2="31" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="28" y1="30" x2="27" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="31" y1="29" x2="31" y2="27" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="34" y1="30" x2="35.5" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="36.5" y1="33" x2="38.5" y2="31.5" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="45" y1="33" x2="43.5" y2="31" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="48" y1="30" x2="47" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="51" y1="29" x2="51" y2="27" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="54" y1="30" x2="55.5" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <line x1="56.5" y1="33" x2="58.5" y2="31.5" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
+    <!-- prominent rosy cheeks — cute and innocent -->
+    <ellipse cx="23" cy="42" rx="5.5" ry="3.5" fill="#FFAAAA" opacity="0.38"/>
+    <ellipse cx="57" cy="42" rx="5.5" ry="3.5" fill="#FFAAAA" opacity="0.38"/>
+    <!-- tiny button nose -->
+    <path d="M38.5,44 Q40,45.5 41.5,44" stroke="#D09878" stroke-width="1" fill="none" stroke-linecap="round"/>
+    <!-- happy innocent smile — wide and warm -->
+    <path d="M33,50.5 Q37,55 40,55.5 Q43,55 47,50.5" stroke="#C86070" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- slight tooth hint -->
+    <path d="M35,52 Q40,56.5 45,52 Q40,55 35,52Z" fill="white" opacity="0.55"/>
+  </g>
+</svg>"""
+
+AVATAR_SVG = {"YHU010": BOY_AVATAR_SVG, "SPJEN": GIRL_AVATAR_SVG}
 
 if "current_user" not in st.session_state:
     st.markdown("""
@@ -513,23 +709,26 @@ if "current_user" not in st.session_state:
     </style>
     """, unsafe_allow_html=True)
 
-    # Dark full-page header
-    st.markdown("""
+    st.markdown(f"""
     <div style="background:#0D1B2A;margin:0 -6rem;padding:2rem 6rem 1.6rem 6rem;
                 border-bottom:3px solid #C5973A;">
-        <h1 style="font-size:1.9rem;font-weight:800;color:#FFF;margin:0;
-                   font-family:Georgia,serif;letter-spacing:-0.5px;">📚 UncoverLit</h1>
-        <p style="color:#8A9BB0;font-size:0.82rem;margin:0.2rem 0 0 0;
-                  text-transform:uppercase;letter-spacing:0.03em;">
-            Curated reads that change lives
-        </p>
+        <div style="display:flex;align-items:center;gap:14px;">
+            {LOGO_SVG}
+            <div>
+                <div style="font-size:1.9rem;font-weight:800;margin:0;
+                            font-family:Georgia,serif;letter-spacing:-0.5px;line-height:1.1;">
+                    <span style="color:#FFFFFF;">Uncover</span><span style="color:#C5973A;">Lit</span>
+                </div>
+                <div style="color:#8A9BB0;font-size:0.78rem;margin:0.15rem 0 0 0;
+                            text-transform:uppercase;letter-spacing:0.06em;">
+                    Curated reads that change lives
+                </div>
+            </div>
+        </div>
     </div>
     <div style="text-align:center;padding:4rem 0 2.5rem 0;">
-        <p style="font-size:1.9rem;font-weight:700;color:#FFFFFF;margin:0 0 0.5rem 0;
+        <p style="font-size:1.9rem;font-weight:700;color:#FFFFFF;margin:0;
                   font-family:Georgia,serif;">Who's reading today?</p>
-        <p style="font-size:0.95rem;color:#6A8AAA;margin:0;">
-            Your reading history is saved — dismissed books stay hidden on every visit.
-        </p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -537,10 +736,8 @@ if "current_user" not in st.session_state:
     _, c1, gap, c2, _ = st.columns([1.2, 1, 0.15, 1, 1.2])
 
     for col, name in zip([c1, c2], PRESET_USERS):
-        dark, light = AVATAR_COLORS.get(name, ("#1B3A6B", "#4A7CC7"))
-        initial = name[0].upper()
+        avatar = AVATAR_SVG.get(name, "")
         with col:
-            # Visual card rendered as HTML
             st.markdown(f"""
             <div style="
                 background: #132030;
@@ -553,15 +750,10 @@ if "current_user" not in st.session_state:
                 cursor: pointer;
             " onmouseover="this.style.borderColor='#C5973A';this.style.boxShadow='0 8px 32px rgba(197,151,58,0.22)'"
               onmouseout="this.style.borderColor='#1E3048';this.style.boxShadow='none'">
-                <div style="
-                    width: 72px; height: 72px;
-                    border-radius: 50%;
-                    background: linear-gradient(135deg, {dark}, {light});
-                    display: flex; align-items: center; justify-content: center;
-                    margin: 0 auto 1rem auto;
-                    font-size: 1.8rem; font-weight: 800; color: white;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-                ">{initial}</div>
+                <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;
+                            margin:0 auto 1rem auto;box-shadow:0 4px 20px rgba(0,0,0,0.4);">
+                    {avatar}
+                </div>
                 <p style="color:#FFFFFF;font-size:1.1rem;font-weight:700;
                            margin:0 0 0.2rem 0;letter-spacing:0.08em;">{name}</p>
                 <p style="color:#4A6A8A;font-size:0.75rem;margin:0;">
@@ -593,6 +785,7 @@ if "current_user" not in st.session_state:
             if st.button("select", key=f"pick_{name}", use_container_width=True):
                 st.session_state.current_user = name
                 st.session_state.dismissed = db_load_dismissed(name)
+                st.session_state.ratings = db_load_ratings(name)
                 st.rerun()
 
     st.stop()
@@ -602,6 +795,33 @@ if "current_user" not in st.session_state:
 # dismissed is a flat set of book_ids (loaded from Supabase on login)
 if "dismissed" not in st.session_state:
     st.session_state.dismissed = db_load_dismissed(st.session_state.current_user)
+
+# ratings: {book_id: 1-5}
+if "ratings" not in st.session_state:
+    st.session_state.ratings = db_load_ratings(st.session_state.current_user)
+
+# Flat list of all books across categories (used by smart sort)
+BOOKS_ALL = [b for cat_books in BOOKS.values() for b in cat_books]
+BOOK_BY_ID = {b["id"]: b for b in BOOKS_ALL}
+
+def smart_sort(books: list) -> list:
+    """Reorder books so liked-badge books come first, disliked-badge books last."""
+    ratings = st.session_state.ratings
+    liked_badges, disliked_badges = set(), set()
+    for bid, r in ratings.items():
+        b = BOOK_BY_ID.get(bid)
+        if b:
+            if r >= 4:
+                liked_badges.add(b["badge"])
+            elif r <= 2:
+                disliked_badges.add(b["badge"])
+    def _score(book):
+        if book["badge"] in liked_badges and book["badge"] not in disliked_badges:
+            return 0
+        if book["badge"] in disliked_badges and book["badge"] not in liked_badges:
+            return 2
+        return 1
+    return sorted(books, key=_score)
 
 def dismiss_book(book_id: str):
     st.session_state.dismissed.add(book_id)
@@ -622,8 +842,19 @@ user = st.session_state.current_user
 st.markdown(f"""
 <div class="site-header">
     <div class="site-header-left">
-        <h1>📚 UncoverLit</h1>
-        <p>Curated reads that change lives &nbsp;·&nbsp; Handpicked across every genre that matters</p>
+        <div style="display:flex;align-items:center;gap:14px;">
+            {LOGO_SVG}
+            <div>
+                <div style="font-size:1.9rem;font-weight:800;font-family:Georgia,serif;
+                            letter-spacing:-0.5px;line-height:1.1;">
+                    <span style="color:#FFFFFF;">Uncover</span><span style="color:#C5973A;">Lit</span>
+                </div>
+                <div style="color:#8A9BB0;font-size:0.78rem;margin-top:0.15rem;
+                            text-transform:uppercase;letter-spacing:0.06em;">
+                    Curated reads that change lives
+                </div>
+            </div>
+        </div>
     </div>
     <div class="site-header-right">
         👤 Reading as <strong style="color:#E8C97A">{user}</strong><br>
@@ -670,7 +901,7 @@ tabs = st.tabs(list(BOOKS.keys()))
 
 for tab, category in zip(tabs, BOOKS.keys()):
     with tab:
-        visible   = [b for b in BOOKS[category] if b["id"] not in st.session_state.dismissed]
+        visible   = smart_sort([b for b in BOOKS[category] if b["id"] not in st.session_state.dismissed])
         showing   = visible[:SHOW_COUNT]
 
         if not showing:
@@ -705,9 +936,34 @@ for tab, category in zip(tabs, BOOKS.keys()):
                 fallback = "https://placehold.co/300x450/E8ECF0/8A9BB0?text=Book"
 
                 with cols[i % 4]:
+                    # Compute "For You" recommendation signal
+                    ratings = st.session_state.ratings
+                    liked_badges = {BOOK_BY_ID[bid]["badge"] for bid, r in ratings.items()
+                                    if r >= 4 and bid in BOOK_BY_ID}
+                    disliked_badges = {BOOK_BY_ID[bid]["badge"] for bid, r in ratings.items()
+                                       if r <= 2 and bid in BOOK_BY_ID}
+                    is_recommended = (book["badge"] in liked_badges and
+                                      book["badge"] not in disliked_badges)
+                    saved_rating = ratings.get(book["id"], 0)
+                    stars_html = ""
+                    if saved_rating:
+                        filled = "★" * saved_rating
+                        empty  = "☆" * (5 - saved_rating)
+                        stars_html = f"""<div style="font-size:0.85rem;color:#C5973A;
+                            letter-spacing:1px;margin:0 0 0.5rem 0;">{filled}{empty}
+                            <span style="font-size:0.68rem;color:#8A9BB0;margin-left:4px;">
+                                {saved_rating}/5</span></div>"""
+
+                    for_you_html = ""
+                    if is_recommended:
+                        for_you_html = """<div style="display:inline-block;background:#FFF8E8;
+                            color:#A07010;font-size:0.62rem;font-weight:700;padding:2px 7px;
+                            border-radius:4px;text-transform:uppercase;letter-spacing:0.07em;
+                            margin-bottom:0.4rem;">♥ For You</div><br>"""
+
                     with st.container(border=True):
 
-                        # ── Cover + text in ONE markdown call (fixes HTML rendering in Streamlit 1.57) ──
+                        # ── Cover + text in ONE markdown call ──
                         st.markdown(f"""
                         <div style="width:100%;aspect-ratio:2/3;overflow:hidden;background:#EEF1F5;line-height:0;">
                             <img src="{img}" alt="{book['title']}"
@@ -715,7 +971,7 @@ for tab, category in zip(tabs, BOOKS.keys()):
                                  onerror="this.src='{fallback}'">
                         </div>
                         <div style="padding:0.9rem 1rem 0.5rem 1rem;">
-                            <span style="display:inline-block;background:{bg};color:{fg};font-size:0.65rem;
+                            {for_you_html}<span style="display:inline-block;background:{bg};color:{fg};font-size:0.65rem;
                                          font-weight:700;padding:2px 8px;border-radius:4px;
                                          text-transform:uppercase;letter-spacing:0.07em;
                                          margin-bottom:0.55rem;">{book['badge']}</span>
@@ -724,13 +980,14 @@ for tab, category in zip(tabs, BOOKS.keys()):
                             <p style="font-size:0.8rem;color:#7A8FA6;margin:0 0 0.65rem 0;
                                       font-style:italic;">{book['author']}</p>
                             <p style="font-size:0.8rem;color:#4A5568;line-height:1.6;
-                                      margin:0 0 0.85rem 0;">{book['summary']}</p>
+                                      margin:0 0 0.5rem 0;">{book['summary']}</p>
+                            {stars_html}
                         </div>
                         """, unsafe_allow_html=True)
 
                         # ── Action buttons ──
                         with st.container():
-                            st.markdown('<div style="padding: 0 1rem 0.5rem 1rem;">', unsafe_allow_html=True)
+                            st.markdown('<div style="padding: 0 1rem 0.75rem 1rem;">', unsafe_allow_html=True)
                             c1, c2 = st.columns(2)
                             with c1:
                                 st.link_button(
@@ -744,6 +1001,26 @@ for tab, category in zip(tabs, BOOKS.keys()):
                                     everand_url(book["title"]),
                                     use_container_width=True,
                                 )
+
+                            # Star rating (select slider)
+                            star_opts = ["☆ Not rated", "★ 1", "★★ 2", "★★★ 3", "★★★★ 4", "★★★★★ 5"]
+                            cur_idx = saved_rating  # 0 = not rated, 1-5 = stars
+                            chosen = st.select_slider(
+                                "Rate",
+                                options=star_opts,
+                                value=star_opts[cur_idx],
+                                key=f"rate_{book['id']}",
+                                label_visibility="collapsed",
+                            )
+                            new_idx = star_opts.index(chosen)
+                            if new_idx != cur_idx:
+                                if new_idx == 0:
+                                    st.session_state.ratings.pop(book["id"], None)
+                                else:
+                                    st.session_state.ratings[book["id"]] = new_idx
+                                    db_save_rating(st.session_state.current_user,
+                                                   book["id"], new_idx)
+                                st.rerun()
 
                             if st.button(
                                 "✕  Already read · Not for me",
