@@ -512,39 +512,24 @@ PRESET_USERS = ["YHU010", "SPJEN"]
 
 # ── LOGO SVG ──────────────────────────────────────────────────────────────────
 # Open book: two pages with text lines, clear spine, unmistakably a book
-LOGO_SVG = """<svg width="56" height="48" viewBox="0 0 56 48" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="ll" x1="1" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="#1A4A9A"/><stop offset="100%" stop-color="#3A80CC"/>
-    </linearGradient>
-    <linearGradient id="lr" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#A87020"/><stop offset="100%" stop-color="#E0B040"/>
-    </linearGradient>
-  </defs>
-  <!-- left page — sweeps up-left from spine base -->
-  <path d="M27,45 C20,44 6,38 2,20 C6,6 20,4 27,8Z" fill="url(#ll)"/>
-  <!-- inner highlight left -->
-  <path d="M27,45 C22,44 10,38 8,24 C11,12 22,8 27,8Z" fill="white" opacity="0.07"/>
-  <!-- text lines left -->
-  <line x1="7" y1="19" x2="22" y2="15" stroke="white" stroke-width="0.9" opacity="0.55"/>
-  <line x1="6" y1="25" x2="21" y2="21" stroke="white" stroke-width="0.9" opacity="0.5"/>
-  <line x1="6" y1="31" x2="20" y2="28" stroke="white" stroke-width="0.9" opacity="0.45"/>
-  <line x1="8" y1="37" x2="21" y2="34" stroke="white" stroke-width="0.9" opacity="0.38"/>
-  <!-- right page — sweeps up-right from spine base -->
-  <path d="M29,45 C36,44 50,38 54,20 C50,6 36,4 29,8Z" fill="url(#lr)"/>
-  <!-- inner highlight right -->
-  <path d="M29,45 C34,44 46,38 48,24 C45,12 34,8 29,8Z" fill="white" opacity="0.05"/>
-  <!-- text lines right -->
-  <line x1="34" y1="15" x2="49" y2="19" stroke="white" stroke-width="0.9" opacity="0.55"/>
-  <line x1="35" y1="21" x2="50" y2="25" stroke="white" stroke-width="0.9" opacity="0.5"/>
-  <line x1="36" y1="28" x2="50" y2="31" stroke="white" stroke-width="0.9" opacity="0.45"/>
-  <line x1="35" y1="34" x2="48" y2="37" stroke="white" stroke-width="0.9" opacity="0.38"/>
-  <!-- spine -->
-  <rect x="26.5" y="7" width="3" height="39" rx="1.5" fill="#0D1B2A"/>
-  <!-- top arch — page tops curving away from spine -->
-  <path d="M2,20 C8,4 20,2 28,6 C36,2 48,4 54,20" fill="none" stroke="#0D1B2A" stroke-width="1.1" opacity="0.25"/>
-  <!-- base shadow -->
-  <ellipse cx="28" cy="46" rx="20" ry="2.5" fill="#0D1B2A" opacity="0.15"/>
+LOGO_SVG = """<svg width="40" height="48" viewBox="0 0 40 48" xmlns="http://www.w3.org/2000/svg">
+  <!-- page stack visible on right edge -->
+  <rect x="9" y="5" width="29" height="39" rx="2" fill="#D8E2EE"/>
+  <rect x="8" y="4" width="29" height="39" rx="2" fill="#E4EBF4"/>
+  <!-- front cover -->
+  <rect x="6" y="3" width="29" height="40" rx="2" fill="#2A5FAF"/>
+  <!-- spine / binding — left strip -->
+  <rect x="2" y="3" width="7" height="40" rx="2" fill="#1A3A80"/>
+  <!-- groove between spine and cover -->
+  <line x1="9" y1="3" x2="9" y2="43" stroke="#0D2456" stroke-width="1.2" opacity="0.6"/>
+  <!-- gold band on spine -->
+  <rect x="2" y="17" width="7" height="11" fill="#C5973A" opacity="0.75"/>
+  <!-- decorative title lines on cover -->
+  <line x1="13" y1="14" x2="31" y2="14" stroke="white" stroke-width="1.4" opacity="0.55"/>
+  <line x1="13" y1="19" x2="31" y2="19" stroke="white" stroke-width="1.4" opacity="0.55"/>
+  <line x1="13" y1="24" x2="26" y2="24" stroke="white" stroke-width="1.4" opacity="0.45"/>
+  <line x1="13" y1="32" x2="31" y2="32" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="13" y1="36" x2="28" y2="36" stroke="white" stroke-width="1" opacity="0.3"/>
 </svg>"""
 
 # ── AVATAR SVGs ────────────────────────────────────────────────────────────────
@@ -612,77 +597,56 @@ GIRL_AVATAR_SVG = """<svg width="80" height="80" viewBox="0 0 80 80" xmlns="http
   </defs>
   <circle cx="40" cy="40" r="40" fill="url(#bg_g)"/>
   <g clip-path="url(#cp_g)">
-    <!-- light blouse / shoulders -->
-    <path d="M10,85 Q14,62 26,60 Q33,70 40,72 Q47,70 54,60 Q66,62 70,85Z" fill="#FFCCE5"/>
-    <path d="M32,60 Q36,67 40,69 Q44,67 48,60" stroke="#FFAACC" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-    <!-- pearl necklace -->
-    <circle cx="33" cy="61" r="1.4" fill="#F8F4EE" opacity="0.95"/>
-    <circle cx="36.5" cy="63" r="1.4" fill="#F8F4EE" opacity="0.95"/>
-    <circle cx="40" cy="63.5" r="1.4" fill="#F8F4EE" opacity="0.95"/>
-    <circle cx="43.5" cy="63" r="1.4" fill="#F8F4EE" opacity="0.95"/>
-    <circle cx="47" cy="61" r="1.4" fill="#F8F4EE" opacity="0.95"/>
-    <!-- neck -->
-    <rect x="34" y="53" width="12" height="10" fill="#F8D0A8"/>
-    <!-- small gold stud earrings -->
-    <circle cx="21" cy="40" r="2" fill="#E8C050"/>
-    <circle cx="59" cy="40" r="2" fill="#E8C050"/>
-    <!-- head — round and youthful -->
-    <ellipse cx="40" cy="37" rx="18" ry="20" fill="#F8D0A0"/>
-    <path d="M22,42 Q22,58 40,60 Q58,58 58,42Z" fill="#F8D0A0"/>
-    <ellipse cx="22" cy="38" rx="2.5" ry="4" fill="#F0C090"/>
-    <ellipse cx="58" cy="38" rx="2.5" ry="4" fill="#F0C090"/>
-    <!-- long dark hair — back layer -->
-    <path d="M18,28 Q12,52 14,84 L28,84 Q22,54 23,28Z" fill="#1E0C06"/>
-    <path d="M62,28 Q68,52 66,84 L52,84 Q58,54 57,28Z" fill="#1E0C06"/>
-    <!-- hair top — neat, slight centre part -->
-    <path d="M22,25 Q24,6 40,4 Q56,6 58,25 Q50,12 40,10 Q30,12 22,25Z" fill="#1E0C06"/>
-    <!-- cute pink bow clip on right side -->
-    <path d="M54,19 Q59,15 64,19 Q59,23 54,19Z" fill="#FF80A8"/>
-    <path d="M54,19 Q59,23 64,19 Q59,15 54,19Z" fill="#FF6090" opacity="0.75"/>
-    <circle cx="59" cy="19" r="2.2" fill="#FF4A88"/>
-    <!-- eyebrows — soft gentle arch -->
-    <path d="M26,28 Q31,25.5 36,27" stroke="#1E0C06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-    <path d="M44,27 Q49,25.5 54,28" stroke="#1E0C06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-    <!-- eyes — large, round, innocent (not almond-goth, more circular) -->
-    <ellipse cx="30" cy="35" rx="7" ry="6.5" fill="white"/>
-    <ellipse cx="50" cy="35" rx="7" ry="6.5" fill="white"/>
-    <!-- upper lash line -->
-    <path d="M23,35 Q30,27.5 37,35" stroke="#1E0C06" stroke-width="1.8" fill="#1E0C06"/>
-    <path d="M43,35 Q50,27.5 57,35" stroke="#1E0C06" stroke-width="1.8" fill="#1E0C06"/>
-    <!-- iris — warm caramel brown (bright not dark) -->
-    <circle cx="30" cy="35.5" r="4.2" fill="#7A4020"/>
-    <circle cx="50" cy="35.5" r="4.2" fill="#7A4020"/>
+    <!-- blouse / shoulders -->
+    <path d="M10,85 Q14,64 26,62 Q33,70 40,72 Q47,70 54,62 Q66,64 70,85Z" fill="#FFCCE5"/>
+    <!-- small stud earrings -->
+    <circle cx="22" cy="41" r="1.8" fill="#E8C050"/>
+    <circle cx="58" cy="41" r="1.8" fill="#E8C050"/>
+    <!-- head — rounder, less tall -->
+    <ellipse cx="40" cy="36" rx="17" ry="17" fill="#F8D0A0"/>
+    <!-- jaw — stays compact, no drooping chin -->
+    <path d="M23,40 Q23,52 40,54 Q57,52 57,40Z" fill="#F8D0A0"/>
+    <ellipse cx="23" cy="38" rx="2.5" ry="3.5" fill="#F0C090"/>
+    <ellipse cx="57" cy="38" rx="2.5" ry="3.5" fill="#F0C090"/>
+    <!-- hair back -->
+    <path d="M19,28 Q14,50 16,84 L28,84 Q23,52 24,28Z" fill="#1E0C06"/>
+    <path d="M61,28 Q66,50 64,84 L52,84 Q57,52 56,28Z" fill="#1E0C06"/>
+    <!-- hair top -->
+    <path d="M23,24 Q25,7 40,5 Q55,7 57,24 Q50,13 40,11 Q30,13 23,24Z" fill="#1E0C06"/>
+    <!-- pink bow -->
+    <path d="M53,18 Q58,14 63,18 Q58,22 53,18Z" fill="#FF80A8"/>
+    <path d="M53,18 Q58,22 63,18 Q58,14 53,18Z" fill="#FF6090" opacity="0.7"/>
+    <circle cx="58" cy="18" r="2" fill="#FF4A88"/>
+    <!-- eyebrows — soft, normal thickness -->
+    <path d="M27,27 Q31,25 35,26.5" stroke="#1E0C06" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <path d="M45,26.5 Q49,25 53,27" stroke="#1E0C06" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <!-- eyes — round, normal size, not overdone -->
+    <ellipse cx="31" cy="34" rx="6" ry="5.5" fill="white"/>
+    <ellipse cx="49" cy="34" rx="6" ry="5.5" fill="white"/>
+    <!-- upper lid — simple clean line, NO individual lash strokes -->
+    <path d="M25,34 Q31,28.5 37,34" stroke="#1E0C06" stroke-width="1.6" fill="#1E0C06"/>
+    <path d="M43,34 Q49,28.5 55,34" stroke="#1E0C06" stroke-width="1.6" fill="#1E0C06"/>
+    <!-- iris -->
+    <circle cx="31" cy="34.5" r="3.8" fill="#7A4020"/>
+    <circle cx="49" cy="34.5" r="3.8" fill="#7A4020"/>
     <!-- pupil -->
-    <circle cx="30" cy="35.5" r="2.4" fill="#100804"/>
-    <circle cx="50" cy="35.5" r="2.4" fill="#100804"/>
-    <!-- bright highlights — big and sparkly (innocent look) -->
-    <circle cx="32" cy="33" r="1.8" fill="white" opacity="0.97"/>
-    <circle cx="52" cy="33" r="1.8" fill="white" opacity="0.97"/>
-    <circle cx="28.5" cy="37" r="0.9" fill="white" opacity="0.75"/>
-    <circle cx="48.5" cy="37" r="0.9" fill="white" opacity="0.75"/>
-    <!-- lower lash line — gentle -->
-    <path d="M23,37 Q30,40.5 37,37" stroke="#1E0C06" stroke-width="0.7" fill="none" opacity="0.45"/>
-    <path d="M43,37 Q50,40.5 57,37" stroke="#1E0C06" stroke-width="0.7" fill="none" opacity="0.45"/>
-    <!-- simple sweet upper lashes -->
-    <line x1="25" y1="33" x2="23.5" y2="31" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="28" y1="30" x2="27" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="31" y1="29" x2="31" y2="27" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="34" y1="30" x2="35.5" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="36.5" y1="33" x2="38.5" y2="31.5" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="45" y1="33" x2="43.5" y2="31" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="48" y1="30" x2="47" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="51" y1="29" x2="51" y2="27" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="54" y1="30" x2="55.5" y2="28" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <line x1="56.5" y1="33" x2="58.5" y2="31.5" stroke="#1E0C06" stroke-width="1" stroke-linecap="round"/>
-    <!-- prominent rosy cheeks — cute and innocent -->
-    <ellipse cx="23" cy="42" rx="5.5" ry="3.5" fill="#FFAAAA" opacity="0.38"/>
-    <ellipse cx="57" cy="42" rx="5.5" ry="3.5" fill="#FFAAAA" opacity="0.38"/>
-    <!-- tiny button nose -->
-    <path d="M38.5,44 Q40,45.5 41.5,44" stroke="#D09878" stroke-width="1" fill="none" stroke-linecap="round"/>
-    <!-- happy innocent smile — wide and warm -->
-    <path d="M33,50.5 Q37,55 40,55.5 Q43,55 47,50.5" stroke="#C86070" stroke-width="2" fill="none" stroke-linecap="round"/>
-    <!-- slight tooth hint -->
-    <path d="M35,52 Q40,56.5 45,52 Q40,55 35,52Z" fill="white" opacity="0.55"/>
+    <circle cx="31" cy="34.5" r="2.1" fill="#100804"/>
+    <circle cx="49" cy="34.5" r="2.1" fill="#100804"/>
+    <!-- highlights -->
+    <circle cx="32.5" cy="32.8" r="1.4" fill="white" opacity="0.95"/>
+    <circle cx="50.5" cy="32.8" r="1.4" fill="white" opacity="0.95"/>
+    <circle cx="29.5" cy="35.8" r="0.7" fill="white" opacity="0.6"/>
+    <circle cx="47.5" cy="35.8" r="0.7" fill="white" opacity="0.6"/>
+    <!-- lower lid — very subtle -->
+    <path d="M25,36 Q31,38.5 37,36" stroke="#1E0C06" stroke-width="0.6" fill="none" opacity="0.3"/>
+    <path d="M43,36 Q49,38.5 55,36" stroke="#1E0C06" stroke-width="0.6" fill="none" opacity="0.3"/>
+    <!-- rosy cheeks -->
+    <ellipse cx="23" cy="40" rx="5" ry="3" fill="#FFAAAA" opacity="0.32"/>
+    <ellipse cx="57" cy="40" rx="5" ry="3" fill="#FFAAAA" opacity="0.32"/>
+    <!-- nose -->
+    <path d="M38.5,43 Q40,44.5 41.5,43" stroke="#D09878" stroke-width="1" fill="none" stroke-linecap="round"/>
+    <!-- smile — warm and natural -->
+    <path d="M33,49 Q37,53 40,53.5 Q43,53 47,49" stroke="#C86070" stroke-width="1.8" fill="none" stroke-linecap="round"/>
   </g>
 </svg>"""
 
