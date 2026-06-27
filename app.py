@@ -24,100 +24,131 @@ def _headers():
 
 def db_load_dismissed(user_name: str) -> set:
     """Load all dismissed book_ids for a user."""
-    r = requests.get(
-        f"{SUPA_URL}/rest/v1/dismissed_books",
-        headers=_headers(),
-        params={"user_name": f"eq.{user_name}", "select": "book_id"},
-    )
-    if r.ok:
-        return {row["book_id"] for row in r.json()}
+    try:
+        r = requests.get(
+            f"{SUPA_URL}/rest/v1/dismissed_books",
+            headers=_headers(),
+            params={"user_name": f"eq.{user_name}", "select": "book_id"},
+            timeout=10,
+        )
+        if r.ok:
+            return {row["book_id"] for row in r.json()}
+    except Exception:
+        pass
     return set()
 
 def db_dismiss(user_name: str, book_id: str):
     """Save a single dismissal."""
-    requests.post(
-        f"{SUPA_URL}/rest/v1/dismissed_books",
-        headers=_headers(),
-        json={"user_name": user_name, "book_id": book_id},
-    )
+    try:
+        requests.post(
+            f"{SUPA_URL}/rest/v1/dismissed_books",
+            headers=_headers(),
+            json={"user_name": user_name, "book_id": book_id},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 def db_reset_all(user_name: str):
     """Remove all dismissals for a user."""
-    requests.delete(
-        f"{SUPA_URL}/rest/v1/dismissed_books",
-        headers=_headers(),
-        params={"user_name": f"eq.{user_name}"},
-    )
+    try:
+        requests.delete(
+            f"{SUPA_URL}/rest/v1/dismissed_books",
+            headers=_headers(),
+            params={"user_name": f"eq.{user_name}"},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 def db_reset_category(user_name: str, book_ids: list):
     """Remove dismissals for a specific category."""
     for bid in book_ids:
-        requests.delete(
-            f"{SUPA_URL}/rest/v1/dismissed_books",
-            headers=_headers(),
-            params={"user_name": f"eq.{user_name}", "book_id": f"eq.{bid}"},
-        )
+        try:
+            requests.delete(
+                f"{SUPA_URL}/rest/v1/dismissed_books",
+                headers=_headers(),
+                params={"user_name": f"eq.{user_name}", "book_id": f"eq.{bid}"},
+                timeout=10,
+            )
+        except Exception:
+            pass
 
 def db_get_known_users() -> list:
-    """Return all users who have ever dismissed a book."""
-    r = requests.get(
-        f"{SUPA_URL}/rest/v1/dismissed_books",
-        headers=_headers(),
-        params={"select": "user_name"},
-    )
-    if r.ok:
-        return sorted({row["user_name"] for row in r.json()})
+    try:
+        r = requests.get(
+            f"{SUPA_URL}/rest/v1/dismissed_books",
+            headers=_headers(),
+            params={"select": "user_name"},
+            timeout=10,
+        )
+        if r.ok:
+            return sorted({row["user_name"] for row in r.json()})
+    except Exception:
+        pass
     return []
 
 def db_load_ratings(user_name: str) -> dict:
-    """Load all ratings for a user — returns {book_id: rating}."""
-    r = requests.get(
-        f"{SUPA_URL}/rest/v1/book_ratings",
-        headers=_headers(),
-        params={"user_name": f"eq.{user_name}", "select": "book_id,rating"},
-    )
-    if r.ok:
-        return {row["book_id"]: row["rating"] for row in r.json()}
+    try:
+        r = requests.get(
+            f"{SUPA_URL}/rest/v1/book_ratings",
+            headers=_headers(),
+            params={"user_name": f"eq.{user_name}", "select": "book_id,rating"},
+            timeout=10,
+        )
+        if r.ok:
+            return {row["book_id"]: row["rating"] for row in r.json()}
+    except Exception:
+        pass
     return {}
 
 def db_save_rating(user_name: str, book_id: str, rating: int):
-    """Upsert a rating (insert or update if exists)."""
-    upsert_headers = {**_headers(), "Prefer": "resolution=merge-duplicates"}
-    requests.post(
-        f"{SUPA_URL}/rest/v1/book_ratings?on_conflict=user_name,book_id",
-        headers=upsert_headers,
-        json={"user_name": user_name, "book_id": book_id, "rating": rating},
-    )
+    try:
+        upsert_headers = {**_headers(), "Prefer": "resolution=merge-duplicates"}
+        requests.post(
+            f"{SUPA_URL}/rest/v1/book_ratings?on_conflict=user_name,book_id",
+            headers=upsert_headers,
+            json={"user_name": user_name, "book_id": book_id, "rating": rating},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 def db_load_recommended(user_name: str) -> list:
-    """Load all AI-recommended books for a user."""
-    r = requests.get(
-        f"{SUPA_URL}/rest/v1/ai_recommended_books",
-        headers=_headers(),
-        params={"user_name": f"eq.{user_name}", "select": "*", "order": "created_at.asc"},
-    )
-    if r.ok:
-        return r.json()
+    try:
+        r = requests.get(
+            f"{SUPA_URL}/rest/v1/ai_recommended_books",
+            headers=_headers(),
+            params={"user_name": f"eq.{user_name}", "select": "*", "order": "created_at.asc"},
+            timeout=10,
+        )
+        if r.ok:
+            return r.json()
+    except Exception:
+        pass
     return []
 
 def db_save_recommended(user_name: str, book: dict, category: str, triggered_by: str, rating: int):
-    """Save an AI-recommended book to Supabase."""
-    requests.post(
-        f"{SUPA_URL}/rest/v1/ai_recommended_books",
-        headers=_headers(),
-        json={
-            "user_name": user_name,
-            "category": category,
-            "book_id": book["id"],
-            "title": book["title"],
-            "author": book["author"],
-            "isbn": book.get("isbn", ""),
-            "badge": book["badge"],
-            "summary": book["summary"],
-            "triggered_by_book_id": triggered_by,
-            "trigger_rating": rating,
-        },
-    )
+    try:
+        requests.post(
+            f"{SUPA_URL}/rest/v1/ai_recommended_books",
+            headers=_headers(),
+            json={
+                "user_name": user_name,
+                "category": category,
+                "book_id": book["id"],
+                "title": book["title"],
+                "author": book["author"],
+                "isbn": book.get("isbn", ""),
+                "badge": book["badge"],
+                "summary": book["summary"],
+                "triggered_by_book_id": triggered_by,
+                "trigger_rating": rating,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 def get_ai_recommendation(dismissed_book: dict, rating: int, category: str, existing_titles: list):
     """Call Claude to get a replacement book recommendation."""
